@@ -10,5 +10,3 @@ const NewComponent = () => {
 }
 
 export default NewComponent
-
-const styles = StyleSheet.create({})

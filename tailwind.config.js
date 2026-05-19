@@ -4,7 +4,18 @@ module.exports = {
   content: ["./App.{js,jsx,ts,tsx}", "./src/**/*.{js,jsx,ts,tsx}"],
   presets: [require("nativewind/preset")],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        // className="font-zalando"
+        zalando: ["Zalando-Sans"],
+        // className="font-inter"
+        inter: ["Inter-Regular"],
+        // className="font-serif"
+        serif: ["EB-Garamond"], 
+        // className="font-roboto"
+        roboto: ["Roboto-Regular"],
+      },
+    },
   },
   plugins: [],
 }
