@@ -5,6 +5,7 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 
 import Login from './src/auth/Login';
+import Signup from './src/auth/Signup';
 import Dashboard from './src/dashboard/Dashboard';
 import Welcome from './src/auth/Welcome';
 
@@ -44,6 +45,12 @@ export default function App() {
         <Stack.Screen 
           name="Login" 
           component={Login} 
+          options={{ headerShown: false }}
+        />
+
+        <Stack.Screen 
+          name="Signup" 
+          component={Signup} 
           options={{ headerShown: false }}
         />
 

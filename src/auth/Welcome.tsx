@@ -8,7 +8,7 @@ cssInterop(LinearGradient, {
   className: 'style',
 });
 
-const Welcome = () => {
+const Welcome = ({ navigation }: {navigation: any}) => {
   // 2. Create animated values for both blobs
   const blob1Anim = useRef(new Animated.Value(0)).current;
   const blob2Anim = useRef(new Animated.Value(0)).current;
@@ -153,6 +153,7 @@ const Welcome = () => {
             {/* Login Button */}
             <TouchableOpacity 
               activeOpacity={0.8}
+              onPress={() => navigation.navigate('Login')}
               className="bg-white h-16 rounded-full shadow-sm items-center justify-center"
             >
               <Text className="text-gray-700 font-roboto text-xl font-semibold">
@@ -163,6 +164,7 @@ const Welcome = () => {
             {/* Create Account Button */}
             <TouchableOpacity 
               activeOpacity={0.8}
+              onPress={() => navigation.navigate('Signup')}
               className="bg-white h-16 rounded-full shadow-sm items-center justify-center"
             >
               <Text className="text-gray-700 font-roboto text-xl font-semibold">
