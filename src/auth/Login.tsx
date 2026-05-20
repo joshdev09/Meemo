@@ -8,9 +8,11 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  Image
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cssInterop } from 'nativewind';
+
 
 // Interop allows NativeWind's 'className' to safely style the LinearGradient component
 cssInterop(LinearGradient, {
@@ -92,6 +94,15 @@ export default function Login({ navigation }: any) {
         className="absolute w-[250px] h-[250px] opacity-90"
         resizeMode="contain"
       />
+
+      <View className = "top-20 px-7"> 
+        <Image 
+          source = {require('../assets/icons/left.png')}
+          style = {{width: 30, height: 30}}
+          resizeMode = "contain"
+        >  
+        </Image>
+      </View>
 
         {/* LAYER 4: Content Layer */}
         <SafeAreaView className="flex-1 justify-center px-10">
