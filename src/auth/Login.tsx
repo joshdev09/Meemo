@@ -8,11 +8,15 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
-  Image
+  Image,
+  Alert,
+  ActivityIndicator
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cssInterop } from 'nativewind';
-
+import { Ionicons } from '@expo/vector-icons'; // 🔑 Imported Expo icons
+import AsyncStorage from '@react-native-async-storage/async-storage'; // 🔑 Imported for Remember Me functionality
+import { supabase } from '../dashboard/storage/supabase'; 
 
 // Interop allows NativeWind's 'className' to safely style the LinearGradient component
 cssInterop(LinearGradient, {
@@ -23,10 +27,28 @@ export default function Login({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false); 
+  const [showPassword, setShowPassword] = useState(false); 
 
-  // Background Animation Setup (Identical setup to match your Welcome screen)
+  // Background Animation Setup
   const blob1Anim = useRef(new Animated.Value(0)).current;
   const blob2Anim = useRef(new Animated.Value(0)).current;
+
+  // 🔑 NEW: Load saved email when the screen opens
+  useEffect(() => {
+    const loadSavedEmail = async () => {
+      try {
+        const savedEmail = await AsyncStorage.getItem('meemo_saved_email');
+        if (savedEmail) {
+          setEmail(savedEmail);
+          setRememberMe(true);
+        }
+      } catch (e) {
+        console.error('Failed to load email', e);
+      }
+    };
+    loadSavedEmail();
+  }, []);
 
   useEffect(() => {
     const floatBlob1 = Animated.loop(
@@ -60,8 +82,33 @@ export default function Login({ navigation }: any) {
     ],
   };
 
-  const handleLogin = () => {
-    navigation.navigate('Details');
+  const handleLogin = async () => {
+    if (!email || !password) {
+      Alert.alert('Error', 'Please enter both email and password.');
+      return;
+    }
+
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    if (error) {
+      Alert.alert('Login Failed', error.message);
+    } else {
+      // 🔑 NEW: Handle the Remember Me checkbox logic
+      if (rememberMe) {
+        await AsyncStorage.setItem('meemo_saved_email', email);
+      } else {
+        await AsyncStorage.removeItem('meemo_saved_email');
+      }
+      
+      navigation.navigate('Dashboard');
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -77,32 +124,33 @@ export default function Login({ navigation }: any) {
           className="absolute inset-0"
         />
 
-      {/* LAYER 2: Bottom Heavy Purple Blob */}
-      <Animated.Image // 6. Changed to Animated.Image
-        source={require('../assets/images/#977DDF.png')}
-        // Merged your custom style coordinates with the animation transforms 🔑
-        style={[{ bottom: -200, right: 100 }, blob1Transform]} 
-        className="absolute w-[350px] h-[350px] opacity-60"
-        resizeMode="contain"
-      />
+        {/* LAYER 2: Bottom Heavy Purple Blob */}
+        <Animated.Image 
+          source={require('../assets/images/#977DDF.png')}
+          style={[{ bottom: -200, right: 100 }, blob1Transform]} 
+          className="absolute w-[350px] h-[350px] opacity-60"
+          resizeMode="contain"
+        />
 
-      {/* LAYER 3: Bottom Heavy Purple Blob */}
-      <Animated.Image // 6. Changed to Animated.Image
-        source={require('../assets/images/#F2E6EE.png')}
-        // Merged your custom style coordinates with the animation transforms 🔑
-        style={[{ bottom: 90, left: 280 }, blob2Transform]}
-        className="absolute w-[250px] h-[250px] opacity-90"
-        resizeMode="contain"
-      />
+        {/* LAYER 3: Bottom Heavy Purple Blob */}
+        <Animated.Image 
+          source={require('../assets/images/#F2E6EE.png')}
+          style={[{ bottom: 90, left: 280 }, blob2Transform]}
+          className="absolute w-[250px] h-[250px] opacity-90"
+          resizeMode="contain"
+        />
 
-      <View className = "top-20 px-7"> 
-        <Image 
-          source = {require('../assets/icons/left.png')}
-          style = {{width: 30, height: 30}}
-          resizeMode = "contain"
-        >  
-        </Image>
-      </View>
+        <TouchableOpacity 
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Welcome')} // 🔑 Navigates back to the Welcome screen
+          className="top-20 px-7 z-50" // 🔑 Added z-50 to make sure the animated blobs don't cover it
+        > 
+          <Image 
+            source={require('../assets/icons/left.png')}
+            style={{width: 30, height: 30}}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
 
         {/* LAYER 4: Content Layer */}
         <SafeAreaView className="flex-1 justify-center px-10">
@@ -138,14 +186,30 @@ export default function Login({ navigation }: any) {
               <Text className="text-base font-roboto font-medium text-gray-700">
                 Password
               </Text>
-              <TextInput
-                className="bg-[#F6F5F7] h-14 rounded-2xl px-5 text-gray-800 font-roboto text-base"
-                placeholder="********"
-                placeholderTextColor="#A19EAB"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
+              
+              <View className="bg-[#F6F5F7] h-14 rounded-2xl px-5 flex-row items-center">
+                <TextInput
+                  className="flex-1 text-gray-800 font-roboto text-base h-full"
+                  placeholder="********"
+                  placeholderTextColor="#A19EAB"
+                  secureTextEntry={!showPassword} 
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                
+                {/* 🔑 Updated to use the lavender eye icon */}
+                <TouchableOpacity 
+                  activeOpacity={0.7}
+                  onPress={() => setShowPassword(!showPassword)}
+                  className="pl-3 py-2"
+                >
+                  <Ionicons 
+                    name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                    size={22} 
+                    color="#977DDF" 
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Remember Me & Forgot Password Layout Options */}
@@ -174,12 +238,17 @@ export default function Login({ navigation }: any) {
             {/* Submit Action Login Button */}
             <TouchableOpacity
               activeOpacity={0.8}
-              className="bg-[#977DDF] h-16 rounded-full shadow-sm items-center justify-center mt-6"
+              className={`bg-[#977DDF] h-16 rounded-full shadow-sm items-center justify-center mt-6 ${loading ? 'opacity-70' : ''}`}
               onPress={handleLogin}
+              disabled={loading}
             >
-              <Text className="text-white font-roboto text-xl font-semibold">
-                Login
-              </Text>
+              {loading ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text className="text-white font-roboto text-xl font-semibold">
+                  Login
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* Footer Bottom Link Options */}
@@ -191,7 +260,7 @@ export default function Login({ navigation }: any) {
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('Signup')}
               >
-                <Text className="text-xs font-roboto font-semibold text-purple-500">
+                <Text className="text-xs font-roboto font-semibold text-[#977DDF]">
                   Sign Up here
                 </Text>
               </TouchableOpacity>

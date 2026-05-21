@@ -27,7 +27,8 @@
       "favicon": "./src/assets/images/logo.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      "@react-native-community/datetimepicker"
     ]
   }
 }

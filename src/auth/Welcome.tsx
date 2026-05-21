@@ -154,7 +154,7 @@ const Welcome = ({ navigation }: {navigation: any}) => {
             <TouchableOpacity 
               activeOpacity={0.8}
               onPress={() => navigation.navigate('Login')}
-              className="bg-white h-16 rounded-full shadow-sm items-center justify-center"
+              className="bg-white h-16 rounded-full shadow-xl items-center justify-center"
             >
               <Text className="text-gray-700 font-roboto text-xl font-semibold">
                 Login
@@ -165,9 +165,9 @@ const Welcome = ({ navigation }: {navigation: any}) => {
             <TouchableOpacity 
               activeOpacity={0.8}
               onPress={() => navigation.navigate('Signup')}
-              className="bg-white h-16 rounded-full shadow-sm items-center justify-center"
+              className="bg-[#110F1B] h-16 rounded-full shadow-xl items-center justify-center"
             >
-              <Text className="text-gray-700 font-roboto text-xl font-semibold">
+              <Text className="text-white font-roboto text-xl font-semibold">
                 Create Account
               </Text>
             </TouchableOpacity>

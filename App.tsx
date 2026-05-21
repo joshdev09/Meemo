@@ -3,11 +3,16 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+// --- Auth Screens ---
 import Login from './src/auth/Login';
 import Signup from './src/auth/Signup';
-import Dashboard from './src/dashboard/Dashboard';
 import Welcome from './src/auth/Welcome';
+
+// --- Dashboard Screens & Context ---
+import { EventsProvider } from './src/dashboard/context/EventsContext';
+import HomeScreen from './src/dashboard/screens/HomeScreen';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -33,34 +38,40 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator initialRouteName="Home">
-        
-        <Stack.Screen 
-          name="Home" 
-          component={Welcome} 
-          options={{ headerShown: false }} 
-        />
-
-        <Stack.Screen 
-          name="Login" 
-          component={Login} 
-          options={{ headerShown: false }}
-        />
-
-        <Stack.Screen 
-          name="Signup" 
-          component={Signup} 
-          options={{ headerShown: false }}
-        />
-
-        <Stack.Screen 
-          name="Details" 
-          component={Dashboard}
-          options={{ headerShown: false }} 
-        />
-        
-      </Stack.Navigator>
-    </NavigationContainer>
+    // GestureHandlerRootView is strictly required for the Bottom Sheet (EventModal) to function
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      {/* EventsProvider supplies global event state to the dashboard */}
+      <EventsProvider>
+        <NavigationContainer>
+          <Stack.Navigator initialRouteName="Welcome">
+            
+            {/* Auth Stack */}
+            <Stack.Screen 
+              name="Welcome" 
+              component={Welcome} 
+              options={{ headerShown: false }} 
+            />
+            <Stack.Screen 
+              name="Login" 
+              component={Login} 
+              options={{ headerShown: false }}
+            />
+            <Stack.Screen 
+              name="Signup" 
+              component={Signup} 
+              options={{ headerShown: false }}
+            />
+            
+            {/* Main Dashboard */}
+            <Stack.Screen 
+              name="Dashboard" 
+              component={HomeScreen} 
+              options={{ headerShown: false }}
+            />
+            
+          </Stack.Navigator>
+        </NavigationContainer>
+      </EventsProvider>
+    </GestureHandlerRootView>
   );
 }
