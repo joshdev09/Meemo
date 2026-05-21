@@ -8,9 +8,14 @@ import {
   Animated,
   KeyboardAvoidingView,
   Platform,
+  Alert,
+  ActivityIndicator,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cssInterop } from 'nativewind';
+import { Ionicons } from '@expo/vector-icons'; // 🔑 Imported Expo icons for the eye toggle
+import { supabase } from '../dashboard/storage/supabase'; 
 
 // Interop allows NativeWind's 'className' to safely style the LinearGradient component
 cssInterop(LinearGradient, {
@@ -22,6 +27,9 @@ export default function Signup({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false); 
+  const [showPassword, setShowPassword] = useState(false); // 🔑 Visibility state for password
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); // 🔑 Visibility state for confirm password
 
   // Background Animation Setup (Identical to your other frames)
   const blob1Anim = useRef(new Animated.Value(0)).current;
@@ -59,9 +67,40 @@ export default function Signup({ navigation }: any) {
     ],
   };
 
-  const handleSignup = () => {
-    // Navigate onward or trigger context signup registration actions
-    navigation.navigate('Details');
+  const handleSignup = async () => {
+    // 1. Basic Validation
+    if (!name || !email || !password) {
+      Alert.alert('Error', 'Please fill in all fields.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      Alert.alert('Error', 'Passwords do not match!');
+      return;
+    }
+
+    setLoading(true);
+
+    // 2. Supabase Auth Call
+    const { data, error } = await supabase.auth.signUp({
+      email: email,
+      password: password,
+      options: {
+        data: {
+          full_name: name, 
+        },
+      },
+    });
+
+    if (error) {
+      Alert.alert('Signup Failed', error.message);
+    } else {
+      // 3. Success Handling
+      Alert.alert('Success!', 'Please check your email to verify your account.');
+      navigation.navigate('Login');
+    }
+
+    setLoading(false);
   };
 
   return (
@@ -78,13 +117,24 @@ export default function Signup({ navigation }: any) {
         />
 
         {/* LAYER 2: Bottom Heavy Purple Blob */}
-        <Animated.Image // 6. Changed to Animated.Image
+        <Animated.Image 
             source={require('../assets/images/#977DDF.png')}
-            // Merged your custom style coordinates with the animation transforms 🔑
             style={[{ bottom: -200, right: 100 }, blob1Transform]} 
             className="absolute w-[350px] h-[350px] opacity-60"
             resizeMode="contain"
         />
+
+        <TouchableOpacity 
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('Welcome')} // 🔑 Navigates back to the Welcome screen
+          className="top-20 px-7 z-50" // 🔑 Added z-50 to make sure the animated blobs don't cover it
+        > 
+          <Image 
+            source={require('../assets/icons/left.png')}
+            style={{width: 30, height: 30}}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
 
         {/* LAYER 3: Content Layer */}
         <SafeAreaView className="flex-1 justify-center px-10">
@@ -129,45 +179,76 @@ export default function Signup({ navigation }: any) {
               />
             </View>
 
-            {/* Password Input Field */}
+            {/* 🔑 Password Input Field */}
             <View className="gap-y-2">
               <Text className="text-base font-roboto font-medium text-gray-700">
                 Password
               </Text>
-              <TextInput
-                className="bg-[#F6F5F7] h-14 rounded-2xl px-5 text-gray-800 font-roboto text-base"
-                placeholder="********"
-                placeholderTextColor="#A19EAB"
-                secureTextEntry
-                value={password}
-                onChangeText={setPassword}
-              />
+              <View className="bg-[#F6F5F7] h-14 rounded-2xl px-5 flex-row items-center">
+                <TextInput
+                  className="flex-1 text-gray-800 font-roboto text-base h-full"
+                  placeholder="********"
+                  placeholderTextColor="#A19EAB"
+                  secureTextEntry={!showPassword}
+                  value={password}
+                  onChangeText={setPassword}
+                />
+                <TouchableOpacity 
+                  activeOpacity={0.7}
+                  onPress={() => setShowPassword(!showPassword)}
+                  className="pl-3 py-2"
+                >
+                  <Ionicons 
+                    name={showPassword ? "eye-outline" : "eye-off-outline"} 
+                    size={22} 
+                    color="#977DDF" 
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Confirm Password Input Field */}
+            {/* 🔑 Confirm Password Input Field */}
             <View className="gap-y-2">
               <Text className="text-base font-roboto font-medium text-gray-700">
                 Confirm Password
               </Text>
-              <TextInput
-                className="bg-[#F6F5F7] h-14 rounded-2xl px-5 text-gray-800 font-roboto text-base"
-                placeholder="********"
-                placeholderTextColor="#A19EAB"
-                secureTextEntry
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-              />
+              <View className="bg-[#F6F5F7] h-14 rounded-2xl px-5 flex-row items-center">
+                <TextInput
+                  className="flex-1 text-gray-800 font-roboto text-base h-full"
+                  placeholder="********"
+                  placeholderTextColor="#A19EAB"
+                  secureTextEntry={!showConfirmPassword}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                />
+                <TouchableOpacity 
+                  activeOpacity={0.7}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="pl-3 py-2"
+                >
+                  <Ionicons 
+                    name={showConfirmPassword ? "eye-outline" : "eye-off-outline"} 
+                    size={22} 
+                    color="#977DDF" 
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Submit Action Sign Up Button */}
             <TouchableOpacity
               activeOpacity={0.8}
-              className="bg-[#977DDF] h-16 rounded-full shadow-sm items-center justify-center mt-4"
+              className={`bg-[#977DDF] h-16 rounded-full shadow-sm items-center justify-center mt-4 ${loading ? 'opacity-70' : ''}`}
               onPress={handleSignup}
+              disabled={loading}
             >
-              <Text className="text-white font-roboto text-xl font-semibold">
-                Create Account
-              </Text>
+              {loading ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text className="text-white font-roboto text-xl font-semibold">
+                  Create Account
+                </Text>
+              )}
             </TouchableOpacity>
 
             {/* Footer Bottom Redirect Options */}
@@ -179,7 +260,7 @@ export default function Signup({ navigation }: any) {
                 activeOpacity={0.7}
                 onPress={() => navigation.navigate('Login')}
               >
-                <Text className="text-xs font-roboto font-semibold text-purple-500">
+                <Text className="text-xs font-roboto font-semibold text-[#977DDF]">
                   Login here
                 </Text>
               </TouchableOpacity>
