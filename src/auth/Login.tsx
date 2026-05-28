@@ -14,8 +14,8 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cssInterop } from 'nativewind';
-import { Ionicons } from '@expo/vector-icons'; // 🔑 Imported Expo icons
-import AsyncStorage from '@react-native-async-storage/async-storage'; // 🔑 Imported for Remember Me functionality
+import { Ionicons } from '@expo/vector-icons'; 
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../dashboard/storage/supabase'; 
 
 // Interop allows NativeWind's 'className' to safely style the LinearGradient component
