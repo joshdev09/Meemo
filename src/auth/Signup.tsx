@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cssInterop } from 'nativewind';
-import { Ionicons } from '@expo/vector-icons'; // 🔑 Imported Expo icons for the eye toggle
+import { Ionicons } from '@expo/vector-icons'; 
 import { supabase } from '../dashboard/storage/supabase'; 
 
 // Interop allows NativeWind's 'className' to safely style the LinearGradient component

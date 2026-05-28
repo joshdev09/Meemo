@@ -19,6 +19,10 @@ import { useEvents } from '../context/EventsContext';
 import { toDateKey } from '../storage';
 import { AppEvent } from '../types';
 
+// Custom Schedule Icons
+const defSchedIcon = require('../../assets/icons/defSched.png');
+const nightModeSchedIcon = require('../../assets/icons/nightModeSched.png');
+
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
@@ -173,8 +177,7 @@ export default function HomeScreen() {
     initializeAppData();
   }, []);
 
-  // ✅ NEW: Android Navigation Bridge Helper Function
-  // Forces a brief delay to let the drawer close fully before popping a secondary sheet.
+  // Android Navigation Bridge Helper Function
   const handleMenuNavigation = (openTargetModal: () => void) => {
     setIsMenuVisible(false);
     setTimeout(() => {
@@ -182,14 +185,57 @@ export default function HomeScreen() {
     }, Platform.OS === 'android' ? 250 : 0);
   };
 
-  // FUNCTIONAL PUSH NOTIFICATION SCHEDULER
+  // FIXED: FUNCTIONAL PUSH NOTIFICATION SCHEDULER
   const scheduleEventNotification = async (event: AppEvent) => {
     if (!prefNotifications) return;
 
-    await Notifications.cancelScheduledNotificationAsync(event.id);
+    try {
+      await Notifications.cancelScheduledNotificationAsync(event.id);
+    } catch {
+      // No existing notification to cancel
+    }
 
-    const targetTriggerDate = new Date(event.startDate);
-    if (targetTriggerDate.getTime() <= Date.now()) return;
+    const reminder = (event as any).reminder || 'none';
+    const repeat = (event as any).repeat || 'none';
+
+    if (reminder === 'none') return;
+
+    const startDate = new Date(event.startDate);
+    let triggerDate = new Date(startDate);
+
+    // Subtract reminder offset cleanly
+    if (reminder === '10m') {
+      triggerDate = new Date(startDate.getTime() - 10 * 60 * 1000);
+    } else if (reminder === '1h') {
+      triggerDate = new Date(startDate.getTime() - 60 * 60 * 1000);
+    } else if (reminder === '1d') {
+      triggerDate = new Date(startDate.getTime() - 24 * 60 * 60 * 1000);
+    }
+
+    if (triggerDate.getTime() <= Date.now()) return;
+
+    // Build trigger using valid SchedulableTriggerInputTypes structure
+    let triggerInput: any;
+
+    if (repeat === 'daily') {
+      triggerInput = {
+        type: Notifications.SchedulableTriggerInputTypes.DAILY,
+        hour: triggerDate.getHours(),
+        minute: triggerDate.getMinutes(),
+      };
+    } else if (repeat === 'weekly') {
+      triggerInput = {
+        type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+        weekday: triggerDate.getDay() + 1, // Convert JS Sunday (0) to Native (1)
+        hour: triggerDate.getHours(),
+        minute: triggerDate.getMinutes(),
+      };
+    } else {
+      triggerInput = {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: triggerDate,
+      };
+    }
 
     try {
       await Notifications.scheduleNotificationAsync({
@@ -200,7 +246,7 @@ export default function HomeScreen() {
           sound: true,
           priority: Notifications.AndroidNotificationPriority.HIGH,
         },
-        trigger: { date: targetTriggerDate } as any,
+        trigger: triggerInput,
       });
     } catch (err) {
       console.error('Failed to register hardware alert subsystem:', err);
@@ -221,28 +267,24 @@ export default function HomeScreen() {
     setPrefNotifications(value);
     await AsyncStorage.setItem('@pref_notifications', JSON.stringify(value));
     if (!value) {
-      // 1️⃣ CALL ONE: The Exact Calendar Date Reminder
       await Notifications.scheduleNotificationAsync({
         content: {
           title: "Calendar Reminder 📅",
           body: "Your custom schedule tracking frame has reached its date!",
           sound: true,
         },
-        // ✅ FIXED: Encapsulating the date inside the strict object trigger block with the proper Expo Enum
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: selectedDate,
         },
       });
 
-      // 2️⃣ CALL TWO: The Immediate Countdown / Time Interval Alert
       await Notifications.scheduleNotificationAsync({
         content: {
           title: "Meemo Countdown 🚀",
           body: "Get ready! Your tracking timeline has officially begun.",
           sound: true,
         },
-        // ✅ FIXED: Supplying the required TIME_INTERVAL enum value along with your intervals
         trigger: {
           type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           seconds: 5,
@@ -311,6 +353,7 @@ export default function HomeScreen() {
     }
   };
 
+  // FIXED: Now saves 'reminder' and 'repeat' context fields to the local state database object payload
   const handleUpdateAccount = async () => {
     if (!nameInput.trim()) {
       Alert.alert('Error', 'Name field cannot be empty.');
@@ -375,7 +418,9 @@ export default function HomeScreen() {
         endDate: eventData.endDate ? eventData.endDate.toISOString() : undefined,
         location: eventData.location || undefined,
         description: eventData.notes || undefined,
-      };
+        reminder: eventData.reminder,
+        repeat: eventData.repeat,
+      } as any;
       updateEvent(targetedEvent);
     } else {
       targetedEvent = {
@@ -388,7 +433,9 @@ export default function HomeScreen() {
         description: eventData.notes || undefined,
         completed: false,
         createdAt: new Date().toISOString(),
-      };
+        reminder: eventData.reminder,
+        repeat: eventData.repeat,
+      } as any;
       addEvent(targetedEvent);
     }
     
@@ -504,8 +551,12 @@ export default function HomeScreen() {
             {/* EVENTS LIST */}
             {eventsForDate.length === 0 ? (
               <View className="items-center justify-center mt-4">
-                <View className="w-12 h-12 bg-white/20 rounded-xl items-center justify-center mb-3">
-                  <Text className="text-2xl">📅</Text>
+                <View className="w-10 h-10 items-center justify-center mb-3">
+                  <Image 
+                    source={prefDarkMode ? nightModeSchedIcon : defSchedIcon} 
+                    className="w-full h-full"
+                    resizeMode="contain"
+                  />
                 </View>
                 <Text className={`${uiText} font-bold mb-1`}>Nothing scheduled</Text>
                 <Text className={`${uiTextMuted} text-sm`}>Tap the button below to create an event</Text>
@@ -582,7 +633,6 @@ export default function HomeScreen() {
             </View>
 
             {/* Profile Section Mini Display Card */}
-            {/* ✅ FIXED: Wired profile click handler into the new navigation layout bridge */}
             <TouchableOpacity 
               activeOpacity={0.7}
               onPress={() => handleMenuNavigation(() => setIsAccountModalVisible(true))}
@@ -621,7 +671,6 @@ export default function HomeScreen() {
                 <Text className="text-purple-900 font-semibold text-sm">Change Photo</Text>
               </TouchableOpacity>
 
-              {/* ✅ FIXED: Replaced immediate states with single thread time gap buffers */}
               <TouchableOpacity 
                 onPress={() => handleMenuNavigation(() => setIsAccountModalVisible(true))}
                 className="flex-row items-center gap-3 p-3 rounded-xl"
@@ -630,7 +679,6 @@ export default function HomeScreen() {
                 <Text className={`font-medium text-sm ${uiText}`}>Account Settings</Text>
               </TouchableOpacity>
 
-              {/* ✅ FIXED: Replaced immediate states with single thread time gap buffers */}
               <TouchableOpacity 
                 onPress={() => handleMenuNavigation(() => setIsPreferencesVisible(true))}
                 className="flex-row items-center gap-3 p-3 rounded-xl"
@@ -639,7 +687,6 @@ export default function HomeScreen() {
                 <Text className={`font-medium text-sm ${uiText}`}>Preferences</Text>
               </TouchableOpacity>
 
-              {/* ✅ FIXED: Replaced immediate states with single thread time gap buffers */}
               <TouchableOpacity 
                 onPress={() => handleMenuNavigation(() => setIsSupportVisible(true))}
                 className="flex-row items-center gap-3 p-3 rounded-xl"

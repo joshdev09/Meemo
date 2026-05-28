@@ -4,10 +4,12 @@ module.exports = function (api) {
   return {
     presets: [
       ["babel-preset-expo", { jsxImportSource: "nativewind" }],
-      "nativewind/babel", // <-- Moved to presets!
+      "nativewind/babel",
     ],
     plugins: [
-      "react-native-reanimated/plugin", // <-- Reanimated stays in plugins
+      "react-native-reanimated/plugin",
+      '@babel/plugin-transform-nullish-coalescing-operator',
+      '@babel/plugin-transform-optional-chaining',
     ],
   };
 };
