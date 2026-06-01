@@ -15,8 +15,9 @@ import CountdownWidget from '../components/Countdown/CountdownWidget';
 import InteractiveCalendar from '../components/Calendar/InteractiveCalendar';
 import EventModal from '../components/Events/EventModal';
 import EventCard from '../components/Events/EventCard';
+import ContributionGraph from '../components/ContributionGraph/ContributionGraph';
 import { useEvents } from '../context/EventsContext';
-import { toDateKey } from '../storage';
+import { toDateKey, buildContributionsFromEvents } from '../utils';
 import { AppEvent } from '../types';
 
 // Custom Schedule Icons
@@ -353,7 +354,7 @@ export default function HomeScreen() {
     }
   };
 
-  // FIXED: Now saves 'reminder' and 'repeat' context fields to the local state database object payload
+  // FIXED: FUNCTIONAL PUSH NOTIFICATION SCHEDULER
   const handleUpdateAccount = async () => {
     if (!nameInput.trim()) {
       Alert.alert('Error', 'Name field cannot be empty.');
@@ -471,6 +472,12 @@ export default function HomeScreen() {
     });
   }, [events, selectedDate]);
 
+  // ✅ CONTRIBUTIONS MAP - This feeds the contribution graph
+  const contributions = useMemo(() => {
+    if (!events) return {};
+    return buildContributionsFromEvents(events);
+  }, [events]);
+
   const formattedDateString = `${selectedDate.getDate()} ${selectedDate.toLocaleDateString('en-US', { month: 'short' })}`;
 
   const uiBg = prefDarkMode ? 'bg-slate-900' : 'bg-white';
@@ -526,6 +533,11 @@ export default function HomeScreen() {
                   <Text className="text-[#8668C6] font-semibold text-xs">Journal</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+
+            {/* CONTRIBUTION GRAPH */}
+            <View className={`rounded-3xl p-6 mb-6 border ${uiCard}`}>
+              <ContributionGraph contributions={contributions} />
             </View>
 
             {/* CALENDAR */}

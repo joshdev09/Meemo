@@ -1,21 +1,24 @@
-import React, { useMemo, useState, memo } from 'react';
+import React, { useMemo, useState, memo, useRef, useEffect } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
-import Animated, { useSharedValue, useAnimatedStyle, withSpring, FadeIn } from 'react-native-reanimated';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring, FadeIn, withTiming } from 'react-native-reanimated';
 import { COLORS, RADIUS, SPACING, SHADOWS } from '../../constants/theme';
-import { buildContributionGrid, getContributionLevel, getMonthLabels, formatDateLong } from '../../utils';
+import { buildContributionGrid, getContributionLevel, formatDateLong } from '../../utils';
 import { ContributionCell, ContributionsMap } from '../../types';
 
 const { width: SCREEN_W } = Dimensions.get('window');
-const CELL_SIZE = 11;
-const CELL_GAP = 3;
+
+const CELL_SIZE = 12; 
+const CELL_GAP = 4;
 const COL_WIDTH = CELL_SIZE + CELL_GAP;
 
-const LEVEL_COLORS = [
-  COLORS.graphEmpty,
-  COLORS.graphL1,
-  COLORS.graphL2,
-  COLORS.graphL3,
-  COLORS.graphL4,
+const MONTH_NAMES = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+
+const BRAND_LEVEL_COLORS = [
+  '#EBE8F4', 
+  '#D3C6F9', 
+  '#B29AFA', 
+  '#8B64F6', 
+  '#5C25EB', 
 ];
 
 interface GraphCellProps {
@@ -26,10 +29,15 @@ interface GraphCellProps {
 
 const GraphCell = memo(({ cell, onPress, isSelected }: GraphCellProps) => {
   const scale = useSharedValue<number>(1);
+  const ringOpacity = useSharedValue<number>(0);
   const level = getContributionLevel(cell.count);
 
+  useEffect(() => {
+    ringOpacity.value = withTiming(isSelected ? 1 : 0, { duration: 200 });
+  }, [isSelected]);
+
   const handlePress = () => {
-    scale.value = withSpring(0.7, { damping: 10 }, () => {
+    scale.value = withSpring(0.8, { damping: 12, stiffness: 200 }, () => {
       scale.value = withSpring(1);
     });
     onPress(cell);
@@ -39,13 +47,19 @@ const GraphCell = memo(({ cell, onPress, isSelected }: GraphCellProps) => {
     transform: [{ scale: scale.value }],
   }));
 
+  const ringStyle = useAnimatedStyle(() => ({
+    opacity: ringOpacity.value,
+    transform: [{ scale: isSelected ? withSpring(1.4) : 1 }],
+  }));
+
   return (
-    <TouchableOpacity onPress={handlePress} activeOpacity={0.7}>
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.8} style={styles.cellWrapper}>
+      <Animated.View style={[styles.selectionRing, { borderColor: BRAND_LEVEL_COLORS[level || 1] }, ringStyle]} />
+      
       <Animated.View
         style={[
           styles.cell,
-          { backgroundColor: LEVEL_COLORS[level] },
-          isSelected && styles.cellSelected,
+          { backgroundColor: BRAND_LEVEL_COLORS[level] },
           animStyle,
         ]}
       />
@@ -57,17 +71,16 @@ const Tooltip = ({ cell }: { cell: ContributionCell | null }) => {
   if (!cell) return null;
   const count = cell.count;
   const label = count === 0
-    ? 'No tasks completed'
+    ? 'No tasks'
     : count === 1
-    ? '1 task completed'
-    : `${count} tasks completed`;
+    ? '1 task'
+    : `${count} tasks`;
 
   return (
-    <Animated.View entering={FadeIn.duration(180)} style={styles.tooltip}>
+    <Animated.View entering={FadeIn.duration(200)} style={styles.tooltip}>
       <Text style={styles.tooltipText}>
-        {label} · {formatDateLong(cell.date)}
+        <Text style={styles.tooltipBold}>{label}</Text> · {formatDateLong(cell.date)}
       </Text>
-      <View style={styles.tooltipArrow} />
     </Animated.View>
   );
 };
@@ -75,7 +88,7 @@ const Tooltip = ({ cell }: { cell: ContributionCell | null }) => {
 const Legend = () => (
   <View style={styles.legend}>
     <Text style={styles.legendLabel}>Less</Text>
-    {LEVEL_COLORS.map((c, i) => (
+    {BRAND_LEVEL_COLORS.map((c, i) => (
       <View key={i} style={[styles.legendCell, { backgroundColor: c }]} />
     ))}
     <Text style={styles.legendLabel}>More</Text>
@@ -88,13 +101,59 @@ interface ContributionGraphProps {
 
 const ContributionGraph = ({ contributions }: ContributionGraphProps) => {
   const [selectedCell, setSelectedCell] = useState<ContributionCell | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const hasScrolledRef = useRef(false);
 
-  const weeks = useMemo(
+  const baseWeeks = useMemo(
     () => buildContributionGrid(contributions || {}),
     [contributions]
   );
 
-  const monthLabels = useMemo(() => getMonthLabels(weeks), [weeks]);
+  // 1. TRIPLE THE DATA TO CREATE A SEAMLESS LOOP
+  const displayWeeks = useMemo(() => {
+    if (!baseWeeks.length) return [];
+    return [...baseWeeks, ...baseWeeks, ...baseWeeks];
+  }, [baseWeeks]);
+
+  const exactMonthLabels = useMemo(() => {
+    const labels: { label: string; columnIndex: number }[] = [];
+    let lastSeenMonth = -1;
+
+    displayWeeks.forEach((week, columnIndex) => {
+      const firstDayCell = week.find((cell) => cell && cell.date);
+      if (!firstDayCell) return;
+
+      const dateObj = new Date(firstDayCell.date);
+      const monthIndex = dateObj.getMonth();
+
+      if (monthIndex !== lastSeenMonth) {
+        labels.push({
+          label: MONTH_NAMES[monthIndex],
+          columnIndex: columnIndex,
+        });
+        lastSeenMonth = monthIndex;
+      }
+    });
+
+    return labels;
+  }, [displayWeeks]);
+
+  // 2. SCROLL TO THE MIDDLE LOOP ON LOAD
+  useEffect(() => {
+    if (displayWeeks.length > 0 && !hasScrolledRef.current) {
+      hasScrolledRef.current = true;
+      
+      const timeoutId = setTimeout(() => {
+        // Calculate the exact pixel width of one full base year
+        const singleYearWidth = baseWeeks.length * COL_WIDTH;
+        
+        // Instantly place the user at the start of the middle "loop"
+        // so they have a full year to scroll left, and a full year to scroll right
+        scrollViewRef.current?.scrollTo({ x: singleYearWidth, animated: false }); 
+      }, 100);
+      return () => clearTimeout(timeoutId);
+    }
+  }, [displayWeeks.length, baseWeeks.length]);
 
   const handleCellPress = (cell: ContributionCell) => {
     setSelectedCell((prev) => (prev?.key === cell.key ? null : cell));
@@ -107,34 +166,48 @@ const ContributionGraph = ({ contributions }: ContributionGraphProps) => {
 
   return (
     <View>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Activity</Text>
-        <Text style={styles.headerSub}>{totalCompleted} tasks completed this year</Text>
+      <View style={styles.headerRow}>
+        <View>
+          <Text style={styles.headerTitle}>Activity</Text>
+          <Text style={styles.headerSub}>{totalCompleted} tasks completed this year</Text>
+        </View>
+        <Legend />
       </View>
 
-      {selectedCell && <Tooltip cell={selectedCell} />}
+      <View style={styles.tooltipContainer}>
+        {selectedCell && <Tooltip cell={selectedCell} />}
+      </View>
 
       <ScrollView
+        ref={scrollViewRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.graphContent}
         style={styles.graphScroll}
+        scrollEventThrottle={16}
+        decelerationRate="fast"
       >
         <View>
           <View style={styles.monthRow}>
-            {monthLabels.map(({ label, index }: { label: string, index: number }) => (
-              <Text key={`${label}-${index}`} style={[styles.monthLabel, { left: index * COL_WIDTH }]}>
+            {exactMonthLabels.map(({ label, columnIndex }, i) => (
+              <Text
+                key={`month-${label}-${columnIndex}-${i}`}
+                style={[
+                  styles.monthLabel,
+                  { position: 'absolute', left: columnIndex * COL_WIDTH }
+                ]}
+              >
                 {label}
               </Text>
             ))}
           </View>
 
           <View style={styles.grid}>
-            {weeks.map((week: ContributionCell[], wi: number) => (
-              <View key={wi} style={styles.weekCol}>
+            {displayWeeks.map((week: ContributionCell[], wi: number) => (
+              <View key={`col-${wi}`} style={styles.weekCol}>
                 {week.map((cell) => (
                   <GraphCell
-                    key={cell.key}
+                    key={`cell-${wi}-${cell.key}`}
                     cell={cell}
                     onPress={handleCellPress}
                     isSelected={selectedCell?.key === cell.key}
@@ -145,30 +218,67 @@ const ContributionGraph = ({ contributions }: ContributionGraphProps) => {
           </View>
         </View>
       </ScrollView>
-
-      <Legend />
     </View>
   );
 };
 
-const styles = StyleSheet.create({ /* Keep styles precisely as they were */
-  header: { marginBottom: SPACING.sm },
-  headerTitle: { fontSize: 15, fontWeight: '700', color: COLORS.textDark, letterSpacing: 0.2 },
-  headerSub: { fontSize: 11, color: COLORS.textLight, marginTop: 2, fontWeight: '500' },
+const styles = StyleSheet.create({
+  headerRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'flex-end',
+    marginBottom: SPACING.sm 
+  },
+  headerTitle: { fontSize: 16, fontWeight: '800', color: COLORS.textDark, letterSpacing: -0.3 },
+  headerSub: { fontSize: 12, color: COLORS.textLight, marginTop: 4, fontWeight: '500' },
+  
   graphScroll: { marginHorizontal: -SPACING.lg },
-  graphContent: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.sm },
-  monthRow: { flexDirection: 'row', height: 16, position: 'relative', marginBottom: 4 },
-  monthLabel: { position: 'absolute', fontSize: 9, color: COLORS.textLight, fontWeight: '600', letterSpacing: 0.3 },
+  graphContent: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.md, paddingTop: SPACING.xs },
+  
+  monthRow: { flexDirection: 'row', height: 18, marginBottom: 6 },
+  monthLabelContainer: { justifyContent: 'center', alignItems: 'flex-start' },
+  monthLabel: { fontSize: 10, color: '#A09DB0', fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5 },
+  
   grid: { flexDirection: 'row', gap: CELL_GAP },
   weekCol: { gap: CELL_GAP },
-  cell: { width: CELL_SIZE, height: CELL_SIZE, borderRadius: 2 },
-  cellSelected: { borderWidth: 1.5, borderColor: COLORS.primaryDark },
-  tooltip: { backgroundColor: COLORS.textDark, borderRadius: RADIUS.md, paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, marginBottom: SPACING.sm, alignSelf: 'flex-start', maxWidth: '100%' },
-  tooltipText: { fontSize: 11, color: '#FFF', fontWeight: '500', lineHeight: 16 },
-  tooltipArrow: { position: 'absolute', bottom: -5, left: 14, width: 10, height: 10, backgroundColor: COLORS.textDark, transform: [{ rotate: '45deg' }], borderRadius: 1 },
-  legend: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 3, marginTop: SPACING.xs },
-  legendCell: { width: CELL_SIZE, height: CELL_SIZE, borderRadius: 2 },
-  legendLabel: { fontSize: 9, color: COLORS.textLight, fontWeight: '500', marginHorizontal: 2 },
+  
+  cellWrapper: {
+    width: CELL_SIZE,
+    height: CELL_SIZE,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cell: { 
+    width: CELL_SIZE, 
+    height: CELL_SIZE, 
+    borderRadius: CELL_SIZE / 2, 
+  },
+  selectionRing: {
+    position: 'absolute',
+    width: CELL_SIZE,
+    height: CELL_SIZE,
+    borderRadius: CELL_SIZE / 2,
+    borderWidth: 2,
+    backgroundColor: 'transparent',
+  },
+  
+  tooltipContainer: {
+    height: 36, 
+    justifyContent: 'center',
+  },
+  tooltip: { 
+    backgroundColor: '#F4F0FE', 
+    borderRadius: RADIUS.lg, 
+    paddingHorizontal: SPACING.md, 
+    paddingVertical: 6, 
+    alignSelf: 'flex-start',
+  },
+  tooltipText: { fontSize: 12, color: '#5C25EB', fontWeight: '500' },
+  tooltipBold: { fontWeight: '700' },
+  
+  legend: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendCell: { width: 10, height: 10, borderRadius: 5 },
+  legendLabel: { fontSize: 10, color: COLORS.textLight, fontWeight: '600', marginHorizontal: 2 },
 });
 
 export default ContributionGraph;
